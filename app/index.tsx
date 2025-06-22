@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Dimensions, Platform, StatusBar } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { PanGestureHandler } from 'react-native-gesture-handler';
@@ -7,66 +7,18 @@ import Animated, {
   useAnimatedStyle,
   useAnimatedGestureHandler,
   withTiming,
-  runOnJS
+  runOnJS,
+  interpolate,
+  Extrapolate
 } from 'react-native-reanimated';
 
 const { height } = Dimensions.get('window');
 const statusBarHeight = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
+const MINI_PLAYER_HEIGHT = 150;
 
 export default function MusicPlayer() {
-  const [showPlayer, setShowPlayer] = useState(false);
-  const translateY = useSharedValue(height); // Empieza fuera de pantalla
-
-  const openPlayer = useCallback(() => {
-    if (!showPlayer) {
-      setShowPlayer(true);
-    }
-  }, [showPlayer]);
-
-  useEffect(() => {
-    if (showPlayer) {
-      // Esperar un frame para asegurar que el componente esté montado
-      requestAnimationFrame(() => {
-        translateY.value = withTiming(0, { duration: 300 });
-      });
-    }
-  }, [showPlayer]);
-
-  const closePlayer = () => {
-    translateY.value = withTiming(height, { duration: 300 });
-    runOnJS(setShowPlayer)(false);
-  };
-
-  const gestureHandler = useAnimatedGestureHandler({
-    onStart: (_, ctx: any) => {
-      ctx.startY = translateY.value;
-    },
-    onActive: (event, ctx) => {
-      if (event.translationY > 0) {
-        translateY.value = ctx.startY + event.translationY;
-      }
-    },
-    onEnd: () => {
-      if (translateY.value > height * 0.15) {
-        translateY.value = withTiming(height, { duration: 300 });
-        runOnJS(setShowPlayer)(false);
-      } else {
-        translateY.value = withTiming(0, { duration: 300 });
-      }
-    },
-  });
-
-  const miniGestureHandler = useAnimatedGestureHandler({
-    onActive: (event) => {
-      if (event.translationY < -30 && !showPlayer) {
-        runOnJS(setShowPlayer)(true);
-      }
-    },
-  });
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
+  const [isExpanded, setIsExpanded] = useState(false);
+  const translateY = useSharedValue(height - MINI_PLAYER_HEIGHT);
 
   const playlistTracks = [
     { id: 1, title: "No Problem", artist: "Chance the Rapper", genre: "13d • Hip-Hop", color: "#EF4444", image: "👤" },
@@ -82,6 +34,88 @@ export default function MusicPlayer() {
     coverColor: "#EF4444"
   };
 
+  const expandPlayer = () => {
+    setIsExpanded(true);
+    translateY.value = withTiming(0, { duration: 400 });
+  };
+
+  const collapsePlayer = () => {
+    translateY.value = withTiming(height - MINI_PLAYER_HEIGHT, { duration: 400 });
+    setTimeout(() => setIsExpanded(false), 200);
+  };
+
+  const gestureHandler = useAnimatedGestureHandler({
+    onStart: (_, ctx: any) => {
+      ctx.startY = translateY.value;
+    },
+    onActive: (event, ctx) => {
+      const newY = ctx.startY + event.translationY;
+      translateY.value = Math.min(Math.max(newY, 0), height - MINI_PLAYER_HEIGHT);
+    },
+    onEnd: (event) => {
+      const currentY = translateY.value;
+
+      // Umbrales separados
+      const expandThreshold = height * 0.9;  // Umbral para expandir (40% de la pantalla)
+      const collapseThreshold = height * 0.1; // Umbral para colapsar (60% de la pantalla)
+
+      // Determinar si el gesto fue hacia arriba o hacia abajo
+      const gestureDirection = event.velocityY;
+
+      if (gestureDirection < 0) {
+        // Gesto hacia ARRIBA (expandir)
+        if (currentY < expandThreshold) {
+          // Expandir
+          translateY.value = withTiming(0, { duration: 300 });
+          runOnJS(setIsExpanded)(true);
+        } else {
+          // Volver al mini player
+          translateY.value = withTiming(height - MINI_PLAYER_HEIGHT, { duration: 300 });
+          runOnJS(setIsExpanded)(false);
+        }
+      } else {
+        // Gesto hacia ABAJO (colapsar)
+        if (currentY > collapseThreshold) {
+          // Colapsar
+          translateY.value = withTiming(height - MINI_PLAYER_HEIGHT, { duration: 300 });
+          runOnJS(setIsExpanded)(false);
+        } else {
+          // Volver al estado expandido
+          translateY.value = withTiming(0, { duration: 300 });
+          runOnJS(setIsExpanded)(true);
+        }
+      }
+    },
+  });
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: translateY.value }],
+    };
+  });
+
+  // Interpolación para opacidad del contenido del mini player
+  const miniContentOpacity = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      translateY.value,
+      [height - MINI_PLAYER_HEIGHT - 100, height - MINI_PLAYER_HEIGHT],
+      [0, 1],
+      Extrapolate.CLAMP
+    );
+    return { opacity };
+  });
+
+  // Interpolación para opacidad del contenido del player expandido
+  const fullContentOpacity = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      translateY.value,
+      [200, 0],
+      [0, 1],
+      Extrapolate.CLAMP
+    );
+    return { opacity };
+  });
+
   return (
     <View style={{ flex: 1 }}>
       {/* Pantalla de lista de canciones */}
@@ -96,15 +130,22 @@ export default function MusicPlayer() {
         </View>
 
         {/* Lista de canciones */}
-        <ScrollView style={{ flex: 1, paddingHorizontal: 16 }}>
+        <ScrollView style={{ flex: 1, paddingHorizontal: 16, marginBottom: MINI_PLAYER_HEIGHT + 20 }}>
           {playlistTracks.map((track) => (
             <TouchableOpacity
               key={track.id}
-              onPress={openPlayer}
+              onPress={expandPlayer}
               activeOpacity={0.7}
               style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
             >
-              <View style={{ width: 48, height: 48, borderRadius: 8, marginRight: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: track.color }}>
+              <View style={{
+                width: 48,
+                height: 48,
+                marginRight: 12,
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: track.color
+              }}>
                 <Text style={{ fontSize: 20 }}>{track.image}</Text>
               </View>
               <View style={{ flex: 1 }}>
@@ -116,170 +157,256 @@ export default function MusicPlayer() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-
-        {/* Mini Reproductor con gesto hacia arriba */}
-        <PanGestureHandler onGestureEvent={miniGestureHandler}>
-          <Animated.View>
-            <TouchableOpacity
-              onPress={openPlayer}
-              activeOpacity={0.8}
-              style={{
-                backgroundColor: 'white',
-                marginHorizontal: 0,
-                marginBottom: 0,
-                padding: 16,
-                borderTopLeftRadius: 32,
-                borderTopRightRadius: 32,
-                borderBottomLeftRadius: 0,
-                borderBottomRightRadius: 0,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 12,
-                elevation: 8,
-                height: 140,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ width: 40, height: 40, borderRadius: 8, marginRight: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: currentTrack.coverColor }}>
-                  <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>3</Text>
-                </View>
-                <Text style={{ flex: 1, color: '#1F2937', fontSize: 14, fontWeight: '600' }}>{currentTrack.title}</Text>
-                <Ionicons name="pause" size={20} color="#1F2937" style={{ marginHorizontal: 12 }} />
-              </View>
-              <View style={{ marginTop: 12 }}>
-                <View style={{ height: 3, backgroundColor: '#E5E7EB', borderRadius: 2 }}>
-                  <View style={{ height: 3, backgroundColor: '#1F2937', borderRadius: 2, width: '35%' }} />
-                </View>
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        </PanGestureHandler>
       </SafeAreaView>
 
-      {/* Reproductor Grande con gesto hacia abajo */}
-      {showPlayer && (
-        <PanGestureHandler onGestureEvent={gestureHandler}>
-          <Animated.View style={[{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-          }, animatedStyle]}>
-            {/* Dark curved header section */}
-            <View style={{ backgroundColor: '#1e293b', paddingBottom: 32, paddingTop: statusBarHeight }}>
-              {/* Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 }}>
-                <TouchableOpacity onPress={closePlayer} style={{ padding: 8 }}>
-                  <Ionicons name="chevron-down" size={24} color="white" />
-                </TouchableOpacity>
-                <View style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ color: '#9CA3AF', fontSize: 13 }}>Playing from</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                    <Text style={{ color: 'white', fontWeight: '600', fontSize: 13 }}>Polk Top Tracks this Week · All Genres</Text>
-                    <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4 }} />
+      {/* Reproductor Unificado */}
+      <PanGestureHandler onGestureEvent={gestureHandler}>
+        <Animated.View style={[{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: height,
+          backgroundColor: 'white',
+          borderTopLeftRadius: 55,
+          borderTopRightRadius: 55,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.15,
+          shadowRadius: 8,
+          elevation: 10,
+        }, animatedStyle]}>
+
+          {/* Contenido del Mini Player */}
+          {!isExpanded && (
+            <Animated.View style={[{
+              height: MINI_PLAYER_HEIGHT,
+              paddingHorizontal: 25,
+              paddingTop: 15,
+              paddingBottom: 8,
+              justifyContent: 'space-between',
+            }, miniContentOpacity]}>
+              <TouchableOpacity onPress={expandPlayer} style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', height: 70, alignItems: 'center' }}>
+                  {/* Imagen del álbum */}
+                  <View style={{
+                    width: 50,
+                    height: 50,
+                    borderRadius: 30,
+                    marginRight: 10,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: currentTrack.coverColor
+                  }}>
+                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 20 }}>3</Text>
+                  </View>
+
+                  {/* Información de la canción */}
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#1F2937', fontSize: 17, fontWeight: '600' }} numberOfLines={1}>
+                      {currentTrack.title}
+                    </Text>
+                    <Text style={{ color: '#6B7280', fontSize: 15 }} numberOfLines={1}>
+                      {currentTrack.artist}
+                    </Text>
+                  </View>
+
+                  {/* Controles de música */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 12 }}>
+                    {/* Botón anterior */}
+                    <TouchableOpacity style={{ padding: 8, marginRight: 4 }}>
+                      <Ionicons name="play-skip-back" size={22} color="#1F2937" />
+                    </TouchableOpacity>
+
+                    {/* Botón play/pause */}
+                    <TouchableOpacity style={{ padding: 8, marginRight: 4 }}>
+                      <Ionicons name="play" size={26} color="#1F2937" />
+                    </TouchableOpacity>
+
+                    {/* Botón siguiente */}
+                    <TouchableOpacity style={{ padding: 8 }}>
+                      <Ionicons name="play-skip-forward" size={22} color="#1F2937" />
+                    </TouchableOpacity>
                   </View>
                 </View>
-                <TouchableOpacity style={{ padding: 8 }}>
-                  <MaterialIcons name="more-horiz" size={24} color="white" />
-                </TouchableOpacity>
-              </View>
-            </View>
 
-            {/* White curved content section */}
-            <View
-              style={{
+                {/* Barra de progreso */}
+                <View style={{
+                  height: 3,
+                  backgroundColor: '#E5E7EB',
+                  borderRadius: 1.5,
+                  marginTop: 8,
+                  marginHorizontal: 4
+                }}>
+                  <View style={{
+                    height: 3,
+                    backgroundColor: '#1F2937',
+                    borderRadius: 1.5,
+                    width: '35%'
+                  }} />
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+
+          {/* Contenido del Player Expandido */}
+          {isExpanded && (
+            <Animated.View style={[{ flex: 1 , backgroundColor: '#1e293b'}, fullContentOpacity]}>
+              {/* Header del player expandido */}
+              <View style={{
+                paddingTop: statusBarHeight,
+                paddingHorizontal: 16,
+                paddingBottom: 16,
+              }}>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 8
+                }}>
+                  <TouchableOpacity onPress={collapsePlayer} style={{ padding: 8 }}>
+                    <Ionicons name="chevron-down" size={24} color="white" />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1, alignItems: 'center' }}>
+                    <Text style={{ color: '#9CA3AF', fontSize: 13 }}>Playing from</Text>
+                    <Text style={{ color: 'white', fontWeight: '600', fontSize: 13 }}>
+                      Polk Top Tracks this Week
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={{ padding: 8 }}>
+                    <MaterialIcons name="more-horiz" size={24} color="white" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Contenido principal del player expandido */}
+              <View style={{
                 flex: 1,
                 backgroundColor: 'white',
-                borderTopLeftRadius: 32,
-                borderTopRightRadius: 32,
-                marginTop: -32,
-              }}
-            >
-              <View style={{ flex: 1 }}>
+                borderTopLeftRadius: 55,
+                borderTopRightRadius: 55,
+                paddingTop: 40,
+                paddingHorizontal: 32,
+              }}>
+
                 {/* Album Cover */}
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingTop: 32 }}>
-                  <View style={{ width: 280, height: 280, borderRadius: 24, marginBottom: 32, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 12, overflow: 'hidden' }}>
-                    <View
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        position: 'relative',
-                        backgroundColor: currentTrack.coverColor
-                      }}
-                    >
-                      {/* Gradient overlay */}
-                      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.2)' }} />
-
-                      {/* Person silhouette */}
-                      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%' }}>
-                        <View style={{ width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.6)', borderTopLeftRadius: 24, borderTopRightRadius: 24 }} />
-                      </View>
-
-                      {/* Number 3 */}
-                      <View style={{ width: 64, height: 64, backgroundColor: '#1e293b', borderRadius: 32, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-                        <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>3</Text>
-                      </View>
+                <View style={{ alignItems: 'center', marginBottom: 40 }}>
+                  <View style={{
+                    width: 240,
+                    height: 240,
+                    borderRadius: 50,
+                    marginBottom: 60,
+                    marginTop:35,
+                    backgroundColor: currentTrack.coverColor,
+                    shadowColor: '#000',
+                    elevation: 12,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}>
+                    <View style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: 32,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 10
+                    }}>
+                      <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>3</Text>
                     </View>
                   </View>
 
                   {/* Track Info */}
-                  <View style={{ alignItems: 'center', marginBottom: 32 }}>
-                    <Text style={{ color: '#1F2937', fontSize: 22, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' }}>{currentTrack.title}</Text>
-                    <Text style={{ color: '#6B7280', fontSize: 16 }}>{currentTrack.artist}</Text>
-                  </View>
+                  <Text style={{
+                    color: '#1F2937',
+                    fontSize: 24,
+                    fontWeight: 'bold',
+                    marginBottom: 8,
+                    textAlign: 'center'
+                  }}>
+                    {currentTrack.title}
+                  </Text>
+                  <Text style={{ color: '#6B7280', fontSize: 18, textAlign: 'center' }}>
+                    {currentTrack.artist}
+                  </Text>
+                </View>
 
-                  {/* Progress Bar */}
-                  <View style={{ width: '100%', paddingHorizontal: 16, marginBottom: 32 }}>
-                    <View style={{ height: 3, backgroundColor: '#E5E7EB', borderRadius: 2, marginBottom: 8 }}>
-                      <View style={{ height: 3, backgroundColor: '#1F2937', borderRadius: 2, width: '35%' }} />
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ color: '#9CA3AF', fontSize: 12 }}>1:37</Text>
-                      <Text style={{ color: '#9CA3AF', fontSize: 12 }}>4:21</Text>
-                    </View>
+                {/* Progress Bar */}
+                <View style={{ marginBottom: 40 }}>
+                  <View style={{
+                    height: 4,
+                    backgroundColor: '#E5E7EB',
+                    borderRadius: 2,
+                    marginBottom: 8
+                  }}>
+                    <View style={{
+                      height: 4,
+                      backgroundColor: '#1F2937',
+                      borderRadius: 2,
+                      width: '35%'
+                    }} />
                   </View>
-
-                  {/* Controls */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 32, marginBottom: 32 }}>
-                    <TouchableOpacity style={{ padding: 8 }}>
-                      <Ionicons name="shuffle" size={22} color="#9CA3AF" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={{ padding: 8 }}>
-                      <Ionicons name="play-skip-back" size={28} color="#1F2937" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={{ width: 64, height: 64, backgroundColor: '#1F2937', borderRadius: 32, alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="pause" size={28} color="white" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={{ padding: 8 }}>
-                      <Ionicons name="play-skip-forward" size={28} color="#1F2937" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={{ padding: 8 }}>
-                      <Ionicons name="repeat" size={22} color="#9CA3AF" />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Bottom Controls */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 32 }}>
-                    <TouchableOpacity style={{ padding: 8 }}>
-                      <Ionicons name="heart-outline" size={22} color="#1F2937" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={{ padding: 8 }}>
-                      <Ionicons name="share-outline" size={22} color="#1F2937" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={{ padding: 8 }}>
-                      <Ionicons name="add" size={22} color="#1F2937" />
-                    </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ color: '#9CA3AF', fontSize: 12 }}>1:37</Text>
+                    <Text style={{ color: '#9CA3AF', fontSize: 12 }}>4:21</Text>
                   </View>
                 </View>
+
+                {/* Controls */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 40,
+                  paddingHorizontal: 20
+                }}>
+                  <TouchableOpacity style={{ padding: 8 }}>
+                    <Ionicons name="shuffle" size={24} color="#9CA3AF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ padding: 8 }}>
+                    <Ionicons name="play-skip-back" size={32} color="#1F2937" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{
+                    width: 72,
+                    height: 72,
+                    backgroundColor: '#1F2937',
+                    borderRadius: 36,
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Ionicons name="play" size={32} color="white" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ padding: 8 }}>
+                    <Ionicons name="play-skip-forward" size={32} color="#1F2937" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ padding: 8 }}>
+                    <Ionicons name="repeat" size={24} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Bottom Controls */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-around',
+                  paddingBottom: 40
+                }}>
+                  <TouchableOpacity style={{ padding: 12 }}>
+                    <Ionicons name="heart-outline" size={24} color="#1F2937" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ padding: 12 }}>
+                    <Ionicons name="share-outline" size={24} color="#1F2937" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={{ padding: 12 }}>
+                    <Ionicons name="add" size={24} color="#1F2937" />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </Animated.View>
-        </PanGestureHandler>
-      )}
+            </Animated.View>
+          )}
+        </Animated.View>
+      </PanGestureHandler>
     </View>
   );
 }
