@@ -54,33 +54,23 @@ export default function MusicPlayer() {
     },
     onEnd: (event) => {
       const currentY = translateY.value;
-
-      // Umbrales separados
-      const expandThreshold = height * 0.9;  // Umbral para expandir (40% de la pantalla)
-      const collapseThreshold = height * 0.1; // Umbral para colapsar (60% de la pantalla)
-
-      // Determinar si el gesto fue hacia arriba o hacia abajo
+      const expandThreshold = height * 0.9;
+      const collapseThreshold = height * 0.1;
       const gestureDirection = event.velocityY;
 
       if (gestureDirection < 0) {
-        // Gesto hacia ARRIBA (expandir)
         if (currentY < expandThreshold) {
-          // Expandir
           translateY.value = withTiming(0, { duration: 300 });
           runOnJS(setIsExpanded)(true);
         } else {
-          // Volver al mini player
           translateY.value = withTiming(height - MINI_PLAYER_HEIGHT, { duration: 300 });
           runOnJS(setIsExpanded)(false);
         }
       } else {
-        // Gesto hacia ABAJO (colapsar)
         if (currentY > collapseThreshold) {
-          // Colapsar
           translateY.value = withTiming(height - MINI_PLAYER_HEIGHT, { duration: 300 });
           runOnJS(setIsExpanded)(false);
         } else {
-          // Volver al estado expandido
           translateY.value = withTiming(0, { duration: 300 });
           runOnJS(setIsExpanded)(true);
         }
@@ -94,7 +84,6 @@ export default function MusicPlayer() {
     };
   });
 
-  // Interpolación para opacidad del contenido del mini player
   const miniContentOpacity = useAnimatedStyle(() => {
     const opacity = interpolate(
       translateY.value,
@@ -105,7 +94,6 @@ export default function MusicPlayer() {
     return { opacity };
   });
 
-  // Interpolación para opacidad del contenido del player expandido
   const fullContentOpacity = useAnimatedStyle(() => {
     const opacity = interpolate(
       translateY.value,
@@ -117,41 +105,41 @@ export default function MusicPlayer() {
   });
 
   return (
-    <View style={{ flex: 1 }}>
+    <View className="flex-1">
       {/* Pantalla de lista de canciones */}
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#1e293b', paddingTop: statusBarHeight }}>
+      <SafeAreaView className="flex-1 bg-slate-800" style={{ paddingTop: statusBarHeight }}>
         {/* Header */}
-        <View style={{ alignItems: 'center', padding: 16 }}>
-          <Text style={{ color: 'white', fontSize: 13, opacity: 0.7 }}>Playing from</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-            <Text style={{ color: 'white', fontWeight: '600', fontSize: 14 }}>Polk Top Tracks this Week</Text>
+        <View className="items-center p-4">
+          <Text className="text-white text-xs opacity-70">Playing from</Text>
+          <View className="flex-row items-center mt-0.5">
+            <Text className="text-white font-semibold text-sm">Polk Top Tracks this Week</Text>
             <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4 }} />
           </View>
         </View>
 
         {/* Lista de canciones */}
-        <ScrollView style={{ flex: 1, paddingHorizontal: 16, marginBottom: MINI_PLAYER_HEIGHT + 20 }}>
+        <ScrollView
+          className="flex-1 px-4"
+          style={{ marginBottom: MINI_PLAYER_HEIGHT + 20 }}
+          contentContainerStyle={{ paddingBottom: 20 }}
+        >
           {playlistTracks.map((track) => (
             <TouchableOpacity
               key={track.id}
               onPress={expandPlayer}
               activeOpacity={0.7}
-              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
+              className="flex-row items-center py-3"
             >
-              <View style={{
-                width: 48,
-                height: 48,
-                marginRight: 12,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: track.color
-              }}>
-                <Text style={{ fontSize: 20 }}>{track.image}</Text>
+              <View
+                className="w-12 h-12 mr-3 justify-center items-center"
+                style={{ backgroundColor: track.color }}
+              >
+                <Text className="text-xl">{track.image}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: 'white', fontWeight: '500', fontSize: 15 }}>{track.title}</Text>
-                <Text style={{ color: '#9CA3AF', fontSize: 13 }}>{track.artist}</Text>
-                <Text style={{ color: '#6B7280', fontSize: 11 }}>{track.genre}</Text>
+              <View className="flex-1">
+                <Text className="text-white font-medium text-base">{track.title}</Text>
+                <Text className="text-gray-400 text-sm">{track.artist}</Text>
+                <Text className="text-gray-500 text-xs">{track.genre}</Text>
               </View>
               <MaterialIcons name="more-horiz" size={20} color="#6B7280" />
             </TouchableOpacity>
@@ -161,89 +149,71 @@ export default function MusicPlayer() {
 
       {/* Reproductor Unificado */}
       <PanGestureHandler onGestureEvent={gestureHandler}>
-        <Animated.View style={[{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: height,
-          backgroundColor: 'white',
-          borderTopLeftRadius: 55,
-          borderTopRightRadius: 55,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.15,
-          shadowRadius: 8,
-          elevation: 10,
-        }, animatedStyle]}>
+        <Animated.View
+          className="absolute top-0 left-0 right-0 bg-white shadow-lg elevation-10"
+          style={[
+            {
+              height: height,
+              borderTopLeftRadius: 55,
+              borderTopRightRadius: 55,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+            },
+            animatedStyle
+          ]}
+        >
 
           {/* Contenido del Mini Player */}
           {!isExpanded && (
-            <Animated.View style={[{
-              height: MINI_PLAYER_HEIGHT,
-              paddingHorizontal: 25,
-              paddingTop: 15,
-              paddingBottom: 8,
-              justifyContent: 'space-between',
-            }, miniContentOpacity]}>
-              <TouchableOpacity onPress={expandPlayer} style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', height: 70, alignItems: 'center' }}>
+            <Animated.View
+              className="px-6 pt-4 pb-2 justify-between"
+              style={[{ height: MINI_PLAYER_HEIGHT }, miniContentOpacity]}
+            >
+              <TouchableOpacity onPress={expandPlayer} className="flex-1">
+                <View className="flex-row h-16 items-center">
                   {/* Imagen del álbum */}
-                  <View style={{
-                    width: 50,
-                    height: 50,
-                    borderRadius: 30,
-                    marginRight: 10,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    backgroundColor: currentTrack.coverColor
-                  }}>
-                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 20 }}>3</Text>
+                  <View
+                    className="w-12 h-12 rounded-full mr-2.5 justify-center items-center"
+                    style={{ backgroundColor: currentTrack.coverColor }}
+                  >
+                    <Text className="text-white font-bold text-xl">3</Text>
                   </View>
 
                   {/* Información de la canción */}
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#1F2937', fontSize: 17, fontWeight: '600' }} numberOfLines={1}>
+                  <View className="flex-1">
+                    <Text
+                      className="text-gray-800 text-lg font-semibold"
+                      numberOfLines={1}
+                    >
                       {currentTrack.title}
                     </Text>
-                    <Text style={{ color: '#6B7280', fontSize: 15 }} numberOfLines={1}>
+                    <Text
+                      className="text-gray-500 text-base"
+                      numberOfLines={1}
+                    >
                       {currentTrack.artist}
                     </Text>
                   </View>
 
                   {/* Controles de música */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 12 }}>
-                    {/* Botón anterior */}
-                    <TouchableOpacity style={{ padding: 8, marginRight: 4 }}>
+                  <View className="flex-row items-center ml-3">
+                    <TouchableOpacity className="p-2 mr-1">
                       <Ionicons name="play-skip-back" size={22} color="#1F2937" />
                     </TouchableOpacity>
-
-                    {/* Botón play/pause */}
-                    <TouchableOpacity style={{ padding: 8, marginRight: 4 }}>
+                    <TouchableOpacity className="p-2 mr-1">
                       <Ionicons name="play" size={26} color="#1F2937" />
                     </TouchableOpacity>
-
-                    {/* Botón siguiente */}
-                    <TouchableOpacity style={{ padding: 8 }}>
+                    <TouchableOpacity className="p-2">
                       <Ionicons name="play-skip-forward" size={22} color="#1F2937" />
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 {/* Barra de progreso */}
-                <View style={{
-                  height: 3,
-                  backgroundColor: '#E5E7EB',
-                  borderRadius: 1.5,
-                  marginTop: 8,
-                  marginHorizontal: 4
-                }}>
-                  <View style={{
-                    height: 3,
-                    backgroundColor: '#1F2937',
-                    borderRadius: 1.5,
-                    width: '35%'
-                  }} />
+                <View className="h-1 bg-gray-200 rounded-sm mt-2 mx-1">
+                  <View className="h-1 bg-gray-800 rounded-sm" style={{ width: '35%' }} />
                 </View>
               </TouchableOpacity>
             </Animated.View>
@@ -251,154 +221,102 @@ export default function MusicPlayer() {
 
           {/* Contenido del Player Expandido */}
           {isExpanded && (
-            <Animated.View style={[{ flex: 1 , backgroundColor: '#1e293b'}, fullContentOpacity]}>
+            <Animated.View
+              className="flex-1 bg-slate-800"
+              style={[fullContentOpacity]}
+            >
               {/* Header del player expandido */}
-              <View style={{
-                paddingTop: statusBarHeight,
-                paddingHorizontal: 16,
-                paddingBottom: 16,
-              }}>
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingVertical: 8
-                }}>
-                  <TouchableOpacity onPress={collapsePlayer} style={{ padding: 8 }}>
+              <View
+                className="px-4 pb-4"
+                style={{ paddingTop: statusBarHeight }}
+              >
+                <View className="flex-row items-center justify-between py-2">
+                  <TouchableOpacity onPress={collapsePlayer} className="p-2">
                     <Ionicons name="chevron-down" size={24} color="white" />
                   </TouchableOpacity>
-                  <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={{ color: '#9CA3AF', fontSize: 13 }}>Playing from</Text>
-                    <Text style={{ color: 'white', fontWeight: '600', fontSize: 13 }}>
+                  <View className="flex-1 items-center">
+                    <Text className="text-gray-400 text-xs">Playing from</Text>
+                    <Text className="text-white font-semibold text-xs">
                       Polk Top Tracks this Week
                     </Text>
                   </View>
-                  <TouchableOpacity style={{ padding: 8 }}>
+                  <TouchableOpacity className="p-2">
                     <MaterialIcons name="more-horiz" size={24} color="white" />
                   </TouchableOpacity>
                 </View>
               </View>
 
               {/* Contenido principal del player expandido */}
-              <View style={{
-                flex: 1,
-                backgroundColor: 'white',
-                borderTopLeftRadius: 55,
-                borderTopRightRadius: 55,
-                paddingTop: 40,
-                paddingHorizontal: 32,
-              }}>
+              <View className="flex-1 bg-white pt-10 px-8" style={{ borderTopLeftRadius: 55, borderTopRightRadius: 55 }}>
 
                 {/* Album Cover */}
-                <View style={{ alignItems: 'center', marginBottom: 40 }}>
-                  <View style={{
-                    width: 240,
-                    height: 240,
-                    borderRadius: 50,
-                    marginBottom: 60,
-                    marginTop:35,
-                    backgroundColor: currentTrack.coverColor,
-                    shadowColor: '#000',
-                    elevation: 12,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    position: 'relative',
-                    overflow: 'hidden'
-                  }}>
-                    <View style={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: 32,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 10
-                    }}>
-                      <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>3</Text>
+                <View className="items-center mb-10">
+                  <View
+                    className="w-60 h-60 justify-center items-center relative overflow-hidden shadow-xl"
+                    style={{
+                      backgroundColor: currentTrack.coverColor,
+                      elevation: 12,
+                      marginBottom: 60,
+                      marginTop: 35,
+                      borderRadius: 50
+                    }}
+                  >
+                    <View className="w-16 h-16 rounded-full items-center justify-center z-10">
+                      <Text className="text-white text-2xl font-bold">3</Text>
                     </View>
                   </View>
 
                   {/* Track Info */}
-                  <Text style={{
-                    color: '#1F2937',
-                    fontSize: 24,
-                    fontWeight: 'bold',
-                    marginBottom: 8,
-                    textAlign: 'center'
-                  }}>
+                  <Text className="text-gray-800 text-2xl font-bold mb-2 text-center">
                     {currentTrack.title}
                   </Text>
-                  <Text style={{ color: '#6B7280', fontSize: 18, textAlign: 'center' }}>
+                  <Text className="text-gray-500 text-lg text-center">
                     {currentTrack.artist}
                   </Text>
                 </View>
 
                 {/* Progress Bar */}
-                <View style={{ marginBottom: 40 }}>
-                  <View style={{
-                    height: 4,
-                    backgroundColor: '#E5E7EB',
-                    borderRadius: 2,
-                    marginBottom: 8
-                  }}>
-                    <View style={{
-                      height: 4,
-                      backgroundColor: '#1F2937',
-                      borderRadius: 2,
-                      width: '35%'
-                    }} />
+                <View className="mb-10">
+                  <View className="h-1 bg-gray-200 rounded-sm mb-2">
+                    <View className="h-1 bg-gray-800 rounded-sm" style={{ width: '35%' }} />
                   </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ color: '#9CA3AF', fontSize: 12 }}>1:37</Text>
-                    <Text style={{ color: '#9CA3AF', fontSize: 12 }}>4:21</Text>
+                  <View className="flex-row justify-between">
+                    <Text className="text-gray-400 text-xs">1:37</Text>
+                    <Text className="text-gray-400 text-xs">4:21</Text>
                   </View>
                 </View>
 
                 {/* Controls */}
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 40,
-                  paddingHorizontal: 20
-                }}>
-                  <TouchableOpacity style={{ padding: 8 }}>
+                <View className="flex-row items-center justify-between mb-10 px-5">
+                  <TouchableOpacity className="p-2">
                     <Ionicons name="shuffle" size={24} color="#9CA3AF" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={{ padding: 8 }}>
+                  <TouchableOpacity className="p-2">
                     <Ionicons name="play-skip-back" size={32} color="#1F2937" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={{
-                    width: 72,
-                    height: 72,
-                    backgroundColor: '#1F2937',
-                    borderRadius: 36,
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
+                  <TouchableOpacity
+                    className="bg-gray-800 rounded-full items-center justify-center"
+                    style={{ width: 72, height: 72 }}
+                  >
                     <Ionicons name="play" size={32} color="white" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={{ padding: 8 }}>
+                  <TouchableOpacity className="p-2">
                     <Ionicons name="play-skip-forward" size={32} color="#1F2937" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={{ padding: 8 }}>
+                  <TouchableOpacity className="p-2">
                     <Ionicons name="repeat" size={24} color="#9CA3AF" />
                   </TouchableOpacity>
                 </View>
 
                 {/* Bottom Controls */}
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-around',
-                  paddingBottom: 40
-                }}>
-                  <TouchableOpacity style={{ padding: 12 }}>
+                <View className="flex-row items-center justify-around pb-10">
+                  <TouchableOpacity className="p-3">
                     <Ionicons name="heart-outline" size={24} color="#1F2937" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={{ padding: 12 }}>
+                  <TouchableOpacity className="p-3">
                     <Ionicons name="share-outline" size={24} color="#1F2937" />
                   </TouchableOpacity>
-                  <TouchableOpacity style={{ padding: 12 }}>
+                  <TouchableOpacity className="p-3">
                     <Ionicons name="add" size={24} color="#1F2937" />
                   </TouchableOpacity>
                 </View>
