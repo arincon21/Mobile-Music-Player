@@ -1,270 +1,364 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, SafeAreaView, Dimensions, Platform, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  SafeAreaView,
+  Dimensions,
+  Platform,
+  StatusBar,
+} from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { PanGestureHandler } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  useAnimatedGestureHandler,
   withTiming,
   runOnJS,
   interpolate,
-  Extrapolate
+  clamp,
+  withRepeat,
+  withSequence,
+  useAnimatedReaction,
 } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
+// --- Constantes y Tipos ---
 const { height } = Dimensions.get('window');
-const statusBarHeight = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 24;
+const ANDROID_STATUS_BAR_HEIGHT = StatusBar.currentHeight || 24;
+const IOS_STATUS_BAR_HEIGHT = 44;
+const statusBarHeight = Platform.OS === 'ios' ? IOS_STATUS_BAR_HEIGHT : ANDROID_STATUS_BAR_HEIGHT;
+
 const MINI_PLAYER_HEIGHT = 150;
+const TRACK_DURATION_SECONDS = 261; // Duración de ejemplo para la canción (4:21)
+
+// --- Datos de la Playlist ---
+const playlistTracks = [
+  { id: 1, title: "No Problem", artist: "Chance the Rapper", genre: "13d • Hip-Hop", color: "#EF4444", image: "👤" },
+  { id: 2, title: "Lonely", artist: "Yung Bans", genre: "21d • Trap", color: "#8B5CF6", image: "🎤" },
+  { id: 3, title: "Humility", artist: "Gorillaz", genre: "3d • Alternative", color: "#06B6D4", image: "🎸" },
+  { id: 4, title: "Fuck Love", artist: "XXXTENTACION", genre: "29d • Trap", color: "#6B7280", image: "🖤" },
+  { id: 5, title: "Old Town Road", artist: "Lil Nas X", genre: "29d • Country Trap", color: "#374151", image: "🤠" },
+];
 
 export default function MusicPlayer() {
+  // --- Estados de React ---
   const [isExpanded, setIsExpanded] = useState(false);
-  const translateY = useSharedValue(height - MINI_PLAYER_HEIGHT);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [likedTracks, setLikedTracks] = useState(new Set([1, 3]));
 
-  const playlistTracks = [
-    { id: 1, title: "No Problem", artist: "Chance the Rapper", genre: "13d • Hip-Hop", color: "#EF4444", image: "👤" },
-    { id: 2, title: "Lonely", artist: "Yung Bans", genre: "21d • Trap", color: "#8B5CF6", image: "🎤" },
-    { id: 3, title: "Humility", artist: "Gorillaz", genre: "3d • Alternative", color: "#06B6D4", image: "🎸" },
-    { id: 4, title: "Fuck Love", artist: "XXXTENTACION", genre: "29d • Trap", color: "#6B7280", image: "🖤" },
-    { id: 5, title: "Old Town Road", artist: "Lil Nas X", genre: "29d • Country Trap", color: "#374151", image: "🤠" },
-  ];
+  // --- Valores Animados de Reanimated ---
+  const translateY = useSharedValue(height);
+  const playButtonScale = useSharedValue(1);
+  const heartScale = useSharedValue(1);
 
-  const currentTrack = {
-    title: "Bag (feat. Yung Bans)",
-    artist: "Chance the Rapper",
-    coverColor: "#EF4444"
+  // Valores para las barras del ecualizador
+  const eqBar1 = useSharedValue(0.3);
+  const eqBar2 = useSharedValue(0.6);
+  const eqBar3 = useSharedValue(0.4);
+  const eqBar4 = useSharedValue(0.8);
+
+  const currentTrack = playlistTracks[currentTrackIndex];
+
+  // --- Efectos de React (useEffect) ---
+
+  // Efecto para la animación de entrada inicial del reproductor
+  useEffect(() => {
+    translateY.value = withTiming(height - MINI_PLAYER_HEIGHT, { duration: 500 });
+  }, []);
+
+  // Efecto para simular el progreso de la canción
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        setProgress(p => {
+          const newProgress = p + 1 / TRACK_DURATION_SECONDS;
+          if (newProgress >= 1) {
+            runOnJS(nextTrack)();
+            return 0;
+          }
+          return newProgress;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, currentTrackIndex]);
+
+  // Efecto para controlar las animaciones del ecualizador
+  useEffect(() => {
+    const createEqAnimation = () =>
+      withRepeat(
+        withSequence(
+          withTiming(Math.random() * 0.7 + 0.3, { duration: 250 }),
+          withTiming(Math.random() * 0.7 + 0.3, { duration: 300 })
+        ), -1, true
+      );
+
+    if (isPlaying) {
+      eqBar1.value = createEqAnimation();
+      eqBar2.value = createEqAnimation();
+      eqBar3.value = createEqAnimation();
+      eqBar4.value = createEqAnimation();
+    } else {
+      [eqBar1, eqBar2, eqBar3, eqBar4].forEach(bar => bar.value = withTiming(bar.value, { duration: 200 }));
+    }
+  }, [isPlaying]);
+
+  // --- Funciones y Handlers ---
+  const triggerHapticFeedback = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => {
+    Haptics.impactAsync(style);
   };
 
+  const togglePlayPause = () => {
+    triggerHapticFeedback(Haptics.ImpactFeedbackStyle.Medium);
+    playButtonScale.value = withSequence(withTiming(0.85, { duration: 100 }), withTiming(1, { duration: 100 }));
+    setIsPlaying(!isPlaying);
+  };
+
+  const toggleLike = (trackId: number) => {
+    triggerHapticFeedback();
+    const isLiked = likedTracks.has(trackId);
+    if (!isLiked) {
+      heartScale.value = withSequence(withTiming(1.3, { duration: 150 }), withTiming(1, { duration: 150 }));
+    }
+    setLikedTracks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(trackId)) newSet.delete(trackId);
+      else newSet.add(trackId);
+      return newSet;
+    });
+  };
+
+  const switchTrack = (index: number) => {
+    if (index === currentTrackIndex) {
+      expandPlayer();
+      return;
+    }
+    triggerHapticFeedback();
+    setCurrentTrackIndex(index);
+    setProgress(0);
+    if (!isPlaying) {
+      setIsPlaying(true);
+    }
+  };
+
+  const changeTrack = (direction: 'next' | 'prev') => {
+    triggerHapticFeedback();
+    let newIndex;
+    if (direction === 'next') {
+      newIndex = (currentTrackIndex + 1) % playlistTracks.length;
+    } else {
+      newIndex = (currentTrackIndex - 1 + playlistTracks.length) % playlistTracks.length;
+    }
+    setCurrentTrackIndex(newIndex);
+    setProgress(0);
+    if (!isPlaying) setIsPlaying(true);
+  };
+
+  const nextTrack = () => changeTrack('next');
+  const prevTrack = () => changeTrack('prev');
+
   const expandPlayer = () => {
-    setIsExpanded(true);
-    translateY.value = withTiming(0, { duration: 400 });
+    translateY.value = withTiming(statusBarHeight, { duration: 400 });
   };
 
   const collapsePlayer = () => {
     translateY.value = withTiming(height - MINI_PLAYER_HEIGHT, { duration: 400 });
-    setTimeout(() => setIsExpanded(false), 200);
   };
 
-  const gestureHandler = useAnimatedGestureHandler({
-    onStart: (_, ctx: any) => {
-      ctx.startY = translateY.value;
-    },
-    onActive: (event, ctx) => {
-      const newY = ctx.startY + event.translationY;
-      translateY.value = Math.min(Math.max(newY, 0), height - MINI_PLAYER_HEIGHT);
-    },
-    onEnd: (event) => {
-      const currentY = translateY.value;
-      const expandThreshold = height * 0.9;
-      const collapseThreshold = height * 0.1;
-      const gestureDirection = event.velocityY;
-
-      if (gestureDirection < 0) {
-        if (currentY < expandThreshold) {
-          translateY.value = withTiming(0, { duration: 300 });
-          runOnJS(setIsExpanded)(true);
-        } else {
-          translateY.value = withTiming(height - MINI_PLAYER_HEIGHT, { duration: 300 });
-          runOnJS(setIsExpanded)(false);
-        }
-      } else {
-        if (currentY > collapseThreshold) {
-          translateY.value = withTiming(height - MINI_PLAYER_HEIGHT, { duration: 300 });
-          runOnJS(setIsExpanded)(false);
-        } else {
-          translateY.value = withTiming(0, { duration: 300 });
-          runOnJS(setIsExpanded)(true);
-        }
+  // Sincroniza el estado de React `isExpanded` con el valor animado `translateY`
+  useAnimatedReaction(
+    () => translateY.value,
+    (currentValue) => {
+      const isPlayerExpanded = currentValue < height - MINI_PLAYER_HEIGHT;
+      if (isPlayerExpanded !== isExpanded) {
+        runOnJS(setIsExpanded)(isPlayerExpanded);
       }
     },
-  });
+    [isExpanded]
+  );
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateY: translateY.value }],
-    };
-  });
+  // Nuevo Gesture Handler usando la API moderna con arrastre suave
+  const startY = useSharedValue(0);
 
-  const miniContentOpacity = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      translateY.value,
-      [height - MINI_PLAYER_HEIGHT - 100, height - MINI_PLAYER_HEIGHT],
-      [0, 1],
-      Extrapolate.CLAMP
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      startY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      // Permite arrastrar desde cualquier posición actual
+      const newY = startY.value + event.translationY;
+      translateY.value = clamp(newY, statusBarHeight, height - MINI_PLAYER_HEIGHT);
+    })
+    .onEnd((event) => {
+      const goDown = event.velocityY > 500;
+      const goUp = event.velocityY < -500;
+      const shouldCollapse = translateY.value > height * 0.4;
+
+      if (goUp) {
+        translateY.value = withTiming(statusBarHeight, { duration: 400 });
+      } else if (goDown) {
+        translateY.value = withTiming(height - MINI_PLAYER_HEIGHT, { duration: 400 });
+      } else {
+        if (shouldCollapse) {
+          translateY.value = withTiming(height - MINI_PLAYER_HEIGHT, { duration: 400 });
+        } else {
+          translateY.value = withTiming(statusBarHeight, { duration: 400 });
+        }
+      }
+    });
+
+  // --- Componentes Renderizados Anidados ---
+
+  const EqualizerBars = ({ color = 'bg-gray-600' }) => {
+    const bar1Style = useAnimatedStyle(() => ({
+      height: interpolate(eqBar1.value, [0, 1], [4, 16]),
+    }));
+    const bar2Style = useAnimatedStyle(() => ({
+      height: interpolate(eqBar2.value, [0, 1], [4, 16]),
+    }));
+    const bar3Style = useAnimatedStyle(() => ({
+      height: interpolate(eqBar3.value, [0, 1], [4, 16]),
+    }));
+    const bar4Style = useAnimatedStyle(() => ({
+      height: interpolate(eqBar4.value, [0, 1], [4, 16]),
+    }));
+
+    if (!isPlaying) return null;
+
+    return (
+      <View className="flex-row items-end justify-center space-x-1 ml-2 h-4">
+        <Animated.View className={`w-1 ${color} rounded-full`} style={bar1Style} />
+        <Animated.View className={`w-1 ${color} rounded-full`} style={bar2Style} />
+        <Animated.View className={`w-1 ${color} rounded-full`} style={bar3Style} />
+        <Animated.View className={`w-1 ${color} rounded-full`} style={bar4Style} />
+      </View>
     );
-    return { opacity };
-  });
+  };
 
-  const fullContentOpacity = useAnimatedStyle(() => {
-    const opacity = interpolate(
+  const formatTime = (timeInSeconds: number) => {
+    const mins = Math.floor(timeInSeconds / 60);
+    const secs = Math.floor(timeInSeconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // --- Estilos Animados ---
+  const animatedPlayerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  const miniContentOpacity = useAnimatedStyle(() => ({
+    opacity: interpolate(
       translateY.value,
-      [200, 0],
+      [height - MINI_PLAYER_HEIGHT - 50, height - MINI_PLAYER_HEIGHT],
       [0, 1],
-      Extrapolate.CLAMP
-    );
-    return { opacity };
-  });
+      { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+    ),
+  }));
 
+  const fullContentOpacity = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      translateY.value,
+      [statusBarHeight + 100, statusBarHeight],
+      [0, 1],
+      { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+    ),
+  }));
+
+  const playButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: playButtonScale.value }],
+  }));
+
+  const heartAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: heartScale.value }],
+  }));
+
+  // --- Renderizado del Componente Principal ---
   return (
     <View className="flex-1">
-      {/* Pantalla de lista de canciones */}
-      <SafeAreaView className="flex-1 bg-slate-800" style={{ paddingTop: statusBarHeight }}>
-        {/* Header */}
-        <View className="items-center p-4">
-          <Text className="text-white text-xs opacity-70">Playing from</Text>
-          <View className="flex-row items-center mt-0.5">
-            <Text className="text-white font-semibold text-sm">Polk Top Tracks this Week</Text>
-            <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4 }} />
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+      {/* --- Fondo de la App y Lista de Canciones --- */}
+      <SafeAreaView className={`flex-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`} style={{ paddingTop: statusBarHeight }}>
+        <View className="flex-row items-center justify-between p-4 mb-2">
+          <View className="w-8" />
+          <View className="items-center">
+            <Text className={`${isDarkMode ? 'text-white' : 'text-gray-800'} text-xs opacity-70`}>Playing from</Text>
+            <View className="flex-row items-center mt-0.5">
+              <Text className={`${isDarkMode ? 'text-white' : 'text-gray-800'} font-semibold text-sm`}>Polk Top Tracks this Week</Text>
+              <Ionicons name="chevron-down" size={14} color={isDarkMode ? "white" : "#1F2937"} className="ml-1" />
+            </View>
           </View>
+          <TouchableOpacity onPress={() => setIsDarkMode(!isDarkMode)} className="p-2" accessibilityRole="button" accessibilityLabel={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}>
+            <Ionicons name={isDarkMode ? "sunny" : "moon"} size={22} color={isDarkMode ? "white" : "#1F2937"} />
+          </TouchableOpacity>
         </View>
 
-        {/* Lista de canciones */}
-        <ScrollView
-          className="flex-1 px-4"
-          style={{ marginBottom: MINI_PLAYER_HEIGHT + 20 }}
-          contentContainerStyle={{ paddingBottom: 20 }}
-        >
-          {playlistTracks.map((track) => (
+        <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: MINI_PLAYER_HEIGHT + 40 }}>
+          {playlistTracks.map((track, index) => (
             <TouchableOpacity
               key={track.id}
-              onPress={expandPlayer}
+              onPress={() => switchTrack(index)}
               activeOpacity={0.7}
-              className="flex-row items-center py-3"
+              className={`flex-row items-center p-2 rounded-lg mb-2 ${currentTrackIndex === index ? (isDarkMode ? 'bg-slate-700' : 'bg-gray-200') : ''}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Play ${track.title} by ${track.artist}`}
+              accessibilityState={{ selected: currentTrackIndex === index }}
             >
-              <View
-                className="w-12 h-12 mr-3 justify-center items-center"
-                style={{ backgroundColor: track.color }}
-              >
-                <Text className="text-xl">{track.image}</Text>
+              <View className="w-12 h-12 mr-4 justify-center items-center rounded-lg relative" style={{ backgroundColor: track.color }}>
+                <Text className="text-2xl">{track.image}</Text>
               </View>
               <View className="flex-1">
-                <Text className="text-white font-medium text-base">{track.title}</Text>
-                <Text className="text-gray-400 text-sm">{track.artist}</Text>
-                <Text className="text-gray-500 text-xs">{track.genre}</Text>
+                <Text className={`${isDarkMode ? 'text-white' : 'text-gray-800'} font-semibold text-base ${currentTrackIndex === index ? 'text-cyan-400' : ''}`}>{track.title}</Text>
+                <Text className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} text-sm`}>{track.artist}</Text>
               </View>
-              <MaterialIcons name="more-horiz" size={20} color="#6B7280" />
+              {currentTrackIndex === index && (
+                <View className="mr-2">
+                  <EqualizerBars color={`${isDarkMode ? 'bg-white/70' : 'bg-gray-800'}`} />
+                </View>
+              )}
+              <TouchableOpacity onPress={() => toggleLike(track.id)} className="p-2" accessibilityRole="button" accessibilityLabel={likedTracks.has(track.id) ? `Unlike ${track.title}` : `Like ${track.title}`}>
+                <Ionicons name={likedTracks.has(track.id) ? "heart" : "heart-outline"} size={20} color={likedTracks.has(track.id) ? "#EF4444" : "#6B7280"} />
+              </TouchableOpacity>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </SafeAreaView>
 
-      {/* Reproductor Unificado */}
-      <PanGestureHandler onGestureEvent={gestureHandler}>
+      {/* --- Reproductor Unificado (Mini y Expandido) --- */}
+      <GestureDetector gesture={panGesture}>
         <Animated.View
-          className="absolute top-0 left-0 right-0 bg-white shadow-lg elevation-10"
-          style={[
-            {
-              height: height,
-              borderTopLeftRadius: 55,
-              borderTopRightRadius: 55,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.15,
-              shadowRadius: 8,
-            },
-            animatedStyle
-          ]}
+          className={`flex-1 bg-white absolute top-0 h-screen left-0 right-0 rounded-t-[20px]`}
+          style={[animatedPlayerStyle]}
         >
-
-          {/* Contenido del Mini Player */}
-          {!isExpanded && (
-            <Animated.View
-              className="px-6 pt-4 pb-2 justify-between"
-              style={[{ height: MINI_PLAYER_HEIGHT }, miniContentOpacity]}
-            >
-              <TouchableOpacity onPress={expandPlayer} className="flex-1">
-                <View className="flex-row h-16 items-center">
-                  {/* Imagen del álbum */}
-                  <View
-                    className="w-12 h-12 rounded-full mr-2.5 justify-center items-center"
-                    style={{ backgroundColor: currentTrack.coverColor }}
-                  >
-                    <Text className="text-white font-bold text-xl">3</Text>
-                  </View>
-
-                  {/* Información de la canción */}
-                  <View className="flex-1">
-                    <Text
-                      className="text-gray-800 text-lg font-semibold"
-                      numberOfLines={1}
-                    >
-                      {currentTrack.title}
-                    </Text>
-                    <Text
-                      className="text-gray-500 text-base"
-                      numberOfLines={1}
-                    >
-                      {currentTrack.artist}
-                    </Text>
-                  </View>
-
-                  {/* Controles de música */}
-                  <View className="flex-row items-center ml-3">
-                    <TouchableOpacity className="p-2 mr-1">
-                      <Ionicons name="play-skip-back" size={22} color="#1F2937" />
-                    </TouchableOpacity>
-                    <TouchableOpacity className="p-2 mr-1">
-                      <Ionicons name="play" size={26} color="#1F2937" />
-                    </TouchableOpacity>
-                    <TouchableOpacity className="p-2">
-                      <Ionicons name="play-skip-forward" size={22} color="#1F2937" />
-                    </TouchableOpacity>
-                  </View>
+          {/* --- Contenedor del Player Expandido --- */}
+          <Animated.View className={'flex-1'} style={fullContentOpacity}>
+            <View className={`flex-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+              <View className="flex-row items-center justify-between py-2">
+                <TouchableOpacity onPress={collapsePlayer} className="p-2" accessibilityRole="button" accessibilityLabel="Collapse player">
+                  <Ionicons name="chevron-down" size={28} color={isDarkMode ? "white" : "#1F2937"} />
+                </TouchableOpacity>
+                <View className="flex-1 items-center">
+                  <Text className={`${isDarkMode ? 'text-white' : 'text-gray-800'} text-xs opacity-70`}>PLAYING FROM PLAYLIST</Text>
+                  <Text className={`${isDarkMode ? 'text-white' : 'text-gray-800'} font-semibold text-sm`}>Polk Top Tracks this Week</Text>
                 </View>
-
-                {/* Barra de progreso */}
-                <View className="h-1 bg-gray-200 rounded-sm mt-2 mx-1">
-                  <View className="h-1 bg-gray-800 rounded-sm" style={{ width: '35%' }} />
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-
-          {/* Contenido del Player Expandido */}
-          {isExpanded && (
-            <Animated.View
-              className="flex-1 bg-slate-800"
-              style={[fullContentOpacity]}
-            >
-              {/* Header del player expandido */}
-              <View
-                className="px-4 pb-4"
-                style={{ paddingTop: statusBarHeight }}
-              >
-                <View className="flex-row items-center justify-between py-2">
-                  <TouchableOpacity onPress={collapsePlayer} className="p-2">
-                    <Ionicons name="chevron-down" size={24} color="white" />
-                  </TouchableOpacity>
-                  <View className="flex-1 items-center">
-                    <Text className="text-gray-400 text-xs">Playing from</Text>
-                    <Text className="text-white font-semibold text-xs">
-                      Polk Top Tracks this Week
-                    </Text>
-                  </View>
-                  <TouchableOpacity className="p-2">
-                    <MaterialIcons name="more-horiz" size={24} color="white" />
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity className="p-2" accessibilityRole="button" accessibilityLabel="More options">
+                  <MaterialIcons name="more-horiz" size={28} color={isDarkMode ? "white" : "#1F2937"} />
+                </TouchableOpacity>
               </View>
 
               {/* Contenido principal del player expandido */}
-              <View className="flex-1 bg-white pt-10 px-8" style={{ borderTopLeftRadius: 55, borderTopRightRadius: 55 }}>
-
+              <View className="flex-1 bg-white pt-16 px-8 rounded-t-[20px]">
                 {/* Album Cover */}
                 <View className="items-center mb-10">
-                  <View
-                    className="w-60 h-60 justify-center items-center relative overflow-hidden shadow-xl"
-                    style={{
-                      backgroundColor: currentTrack.coverColor,
-                      elevation: 12,
-                      marginBottom: 60,
-                      marginTop: 35,
-                      borderRadius: 50
-                    }}
-                  >
-                    <View className="w-16 h-16 rounded-full items-center justify-center z-10">
-                      <Text className="text-white text-2xl font-bold">3</Text>
-                    </View>
-                  </View>
+                  <Animated.View className="w-80 h-80 self-center justify-center items-center rounded-[50px] mb-12 mt-4" style={[{ backgroundColor: currentTrack.color, shadowColor: currentTrack.color, shadowRadius: 20, shadowOpacity: 0.5 }]}>
+                    <Text className="text-white text-5xl font-bold">{currentTrack.image}</Text>
+                  </Animated.View>
 
                   {/* Track Info */}
                   <Text className="text-gray-800 text-2xl font-bold mb-2 text-center">
@@ -277,11 +371,16 @@ export default function MusicPlayer() {
 
                 {/* Progress Bar */}
                 <View className="mb-10">
-                  <View className="h-1 bg-gray-200 rounded-sm mb-2">
-                    <View className="h-1 bg-gray-800 rounded-sm" style={{ width: '35%' }} />
+                  <View className="h-2 bg-gray-200 rounded-full mb-2">
+                    <View
+                      className="h-2 bg-gray-800 rounded-full transition-all duration-300"
+                      style={{ width: `${progress * 100}%` }}
+                    />
                   </View>
                   <View className="flex-row justify-between">
-                    <Text className="text-gray-400 text-xs">1:37</Text>
+                    <Text className="text-gray-400 text-xs">
+                      {formatTime(progress * 261)}
+                    </Text>
                     <Text className="text-gray-400 text-xs">4:21</Text>
                   </View>
                 </View>
@@ -291,16 +390,23 @@ export default function MusicPlayer() {
                   <TouchableOpacity className="p-2">
                     <Ionicons name="shuffle" size={24} color="#9CA3AF" />
                   </TouchableOpacity>
-                  <TouchableOpacity className="p-2">
+                  <TouchableOpacity onPress={prevTrack} className="p-2">
                     <Ionicons name="play-skip-back" size={32} color="#1F2937" />
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    className="bg-gray-800 rounded-full items-center justify-center"
-                    style={{ width: 72, height: 72 }}
-                  >
-                    <Ionicons name="play" size={32} color="white" />
-                  </TouchableOpacity>
-                  <TouchableOpacity className="p-2">
+                  <Animated.View style={playButtonAnimatedStyle}>
+                    <TouchableOpacity
+                      onPress={togglePlayPause}
+                      className="bg-gray-100 rounded-full items-center justify-center w-[75px] h-[75px]"
+                    >
+                      <Ionicons
+                        name={isPlaying ? "pause" : "play"}
+                        size={32}
+                        color="1F2937"
+                        className={isPlaying ? "" : "pl-1.5"}
+                      />
+                    </TouchableOpacity>
+                  </Animated.View>
+                  <TouchableOpacity onPress={nextTrack} className="p-2">
                     <Ionicons name="play-skip-forward" size={32} color="#1F2937" />
                   </TouchableOpacity>
                   <TouchableOpacity className="p-2">
@@ -309,22 +415,100 @@ export default function MusicPlayer() {
                 </View>
 
                 {/* Bottom Controls */}
-                <View className="flex-row items-center justify-around pb-10">
-                  <TouchableOpacity className="p-3">
-                    <Ionicons name="heart-outline" size={24} color="#1F2937" />
-                  </TouchableOpacity>
-                  <TouchableOpacity className="p-3">
+                <View className="flex-row items-center justify-center pb-10">
+                  <Animated.View style={likedTracks.has(currentTrack.id) ? heartAnimatedStyle : {}}>
+                    <TouchableOpacity
+                      onPress={() => toggleLike(currentTrack.id)}
+                      className="p-5"
+                    >
+                      <Ionicons
+                        name={likedTracks.has(currentTrack.id) ? "heart" : "heart-outline"}
+                        size={24}
+                        color={likedTracks.has(currentTrack.id) ? "#EF4444" : "#1F2937"}
+                      />
+                    </TouchableOpacity>
+                  </Animated.View>
+                  <TouchableOpacity className="p-5">
                     <Ionicons name="share-outline" size={24} color="#1F2937" />
                   </TouchableOpacity>
-                  <TouchableOpacity className="p-3">
+                  <TouchableOpacity className="p-5">
                     <Ionicons name="add" size={24} color="#1F2937" />
                   </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* --- Contenido del Mini Player --- */}
+          {!isExpanded && (
+            <Animated.View
+              className="absolute top-0 left-0 right-0 backdrop-blur-md rounded-t-[20px] pb-10 pt-1"
+              style={[{ height: MINI_PLAYER_HEIGHT }, miniContentOpacity]}
+            >
+              <View className="flex-1 px-6 pt-2 pb-4 justify-center">
+                <View className="absolute w-10 h-1 bg-gray-300 rounded-full self-center mb-3 top-1" />
+
+                <View className="flex-row items-center">
+                  {/* Imagen del álbum */}
+                  <View
+                    className="w-12 h-12 rounded-full mr-4 justify-center items-center"
+                    style={{ backgroundColor: currentTrack.color }}
+                  >
+                    <Text className="text-xl">{currentTrack.image}</Text>
+                  </View>
+
+                  {/* Información de la canción */}
+                  <View className="flex-1">
+                    <Text
+                      className="text-gray-800 text-lg font-semibold min-w-10"
+                      numberOfLines={1}
+                    >
+                      {currentTrack.title}
+                    </Text>
+                    <View className="flex-row items-center">
+                      <Text
+                        className="text-gray-500 text-base mr-1"
+                        numberOfLines={1}
+                      >
+                        {currentTrack.artist}
+                      </Text>
+                      <EqualizerBars />
+                    </View>
+                  </View>
+
+                  {/* Controles de música */}
+                  <View className="flex-row items-center ml-3">
+                    <TouchableOpacity onPress={prevTrack} className="p-3 mr-1">
+                      <Ionicons name="play-skip-back" size={22} color="#1F2937" />
+                    </TouchableOpacity>
+
+                    <Animated.View style={playButtonAnimatedStyle}>
+                      <TouchableOpacity
+                        onPress={togglePlayPause}
+                        className="bg-gray-100 rounded-full items-center justify-center w-[55px] h-[55px]"
+                      >
+                        <Ionicons
+                          name={isPlaying ? "pause" : "play"}
+                          size={26}
+                          color="1F2937"
+                          className={isPlaying ? "" : "pl-1.5"}
+                        />
+                      </TouchableOpacity>
+                    </Animated.View>
+                    <TouchableOpacity onPress={nextTrack} className="p-3">
+                      <Ionicons name="play-skip-forward" size={22} color="#1F2937" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View className="h-1 bg-gray-200 rounded-sm mt-4 mx-1 absolute bottom-4 left-6 right-6">
+                  <View className="h-1 bg-gray-800 rounded-sm" style={{ width: `${progress * 100}%` }} />
                 </View>
               </View>
             </Animated.View>
           )}
         </Animated.View>
-      </PanGestureHandler>
+      </GestureDetector>
     </View>
   );
 }
