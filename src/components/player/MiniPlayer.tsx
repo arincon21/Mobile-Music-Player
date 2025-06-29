@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text } from 'react-native';
 import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import EqualizerBars from '../ui/EqualizerBars';
@@ -17,7 +17,7 @@ interface MiniPlayerProps {
     prevTrack: () => void;
 }
 
-export default function MiniPlayer({
+export default memo(function MiniPlayer({
     currentTrack,
     isPlaying,
     progress,
@@ -104,4 +104,4 @@ export default function MiniPlayer({
             </View>
         </Animated.View>
     );
-}
+});

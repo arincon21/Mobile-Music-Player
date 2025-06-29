@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
@@ -22,7 +22,7 @@ interface ExpandedPlayerProps {
     setIsExpanded: (expanded: boolean) => void;
 }
 
-export default function ExpandedPlayer({
+export default memo(function ExpandedPlayer({
     currentTrack,
     isPlaying,
     progress,
@@ -120,4 +120,4 @@ export default function ExpandedPlayer({
             </View>
         </Animated.View>
     );
-}
+});

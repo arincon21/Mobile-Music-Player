@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { ScrollView } from 'react-native';
 import TrackItem from './TrackItem';
 import { Track } from '../../types';
@@ -14,7 +14,7 @@ interface TrackListProps {
     onToggleLike: (trackId: number) => void;
 }
 
-export default function TrackList({
+export default memo(function TrackList({
     tracks,
     currentTrackIndex,
     isPlaying,
@@ -43,4 +43,4 @@ export default function TrackList({
             ))}
         </ScrollView>
     );
-}
+});

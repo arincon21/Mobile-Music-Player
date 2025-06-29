@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
@@ -12,7 +12,7 @@ interface PlayerControlsProps {
     size: 'mini' | 'full';
 }
 
-export default function PlayerControls({
+export default memo(function PlayerControls({
     isPlaying,
     onTogglePlayPause,
     onNextTrack,
@@ -88,4 +88,4 @@ export default function PlayerControls({
             </TouchableOpacity>
         </View>
     );
-}
+});

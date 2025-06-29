@@ -17,7 +17,8 @@ import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import Header from '@/components/common/Header';
 import ExpandedPlayer from '@/components/player/ExpandedPlayer';
 import MiniPlayer from '@/components/player/MiniPlayer';
-import TrackList from '@/components/playlist/TrackList';
+import TrackItem from '@/components/playlist/TrackItem';
+import { FlatList } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 
 export default function MusicPlayer() {
@@ -136,14 +137,28 @@ export default function MusicPlayer() {
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <SafeAreaView className={`flex-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`} style={{ paddingTop: CONSTANTS.STATUS_BAR_HEIGHT }}>
         <Header isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} />
-        <TrackList
-          tracks={playlistTracks}
-          currentTrackIndex={audioPlayer.currentTrackIndex}
-          isPlaying={audioPlayer.isPlaying}
-          isDarkMode={isDarkMode}
-          likedTracks={likedTracks}
-          onTrackSelect={audioPlayer.setCurrentTrackIndex}
-          onToggleLike={toggleLike}
+        <FlatList
+          data={playlistTracks}
+          renderItem={({ item, index }) => (
+            <TrackItem
+              track={item}
+              index={index}
+              isCurrentTrack={audioPlayer.currentTrackIndex === index}
+              isPlaying={audioPlayer.isPlaying && audioPlayer.currentTrackIndex === index}
+              isDarkMode={isDarkMode}
+              isLiked={likedTracks.has(item.id)}
+              onPress={() => {
+                if (audioPlayer.currentTrackIndex === index) {
+                  audioPlayer.togglePlayPause();
+                } else {
+                  audioPlayer.setCurrentTrackIndex(index);
+                }
+              }}
+              onToggleLike={() => toggleLike(item.id)}
+            />
+          )}
+          keyExtractor={item => item.id.toString()}
+          contentContainerStyle={{ paddingBottom: 120 }}
         />
       </SafeAreaView>
       <GestureDetector gesture={panGesture}>
