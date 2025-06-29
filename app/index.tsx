@@ -6,11 +6,11 @@ import {
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
-import { playlistTracks } from '@/data/playlistData';
 import { CONSTANTS } from '@/utils/constants';
 import { useAnimations } from '@/hooks/useAnimations';
 import { useGestures } from '@/hooks/useGestures';
 import { usePlayer } from '@/hooks/usePlayer';
+import { usePlaylist } from '@/context/PlaylistContext';
 import Header from '@/components/common/Header';
 import ExpandedPlayer from '@/components/player/ExpandedPlayer';
 import MiniPlayer from '@/components/player/MiniPlayer';
@@ -34,6 +34,8 @@ export default function MusicPlayer() {
     toggleLike,
     switchTrack,
   } = usePlayer();
+
+  const { playlistTracks } = usePlaylist();
 
   // --- Valores Animados de Reanimated ---
   const animations = useAnimations(isPlaying);

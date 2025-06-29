@@ -6,11 +6,11 @@ import {
 } from 'react-native';
 import Animated, { withTiming } from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
-import { playlistTracks } from '@/data/playlistData';
 import { CONSTANTS } from '@/utils/constants';
 import { useAnimations } from '@/hooks/useAnimations';
 import { useGestures } from '@/hooks/useGestures';
 import { usePlayer } from '@/hooks/usePlayer';
+import { usePlaylist } from '@/context/PlaylistContext';
 import Header from '@/components/common/Header';
 import ExpandedPlayer from '@/components/player/ExpandedPlayer';
 import MiniPlayer from '@/components/player/MiniPlayer';
@@ -51,6 +51,9 @@ export default function MusicPlayer() {
         animations.translateY.value = withTiming(CONSTANTS.SCREEN_HEIGHT - CONSTANTS.MINI_PLAYER_HEIGHT, { duration: 400 });
         setTimeout(() => setIsExpanded(false), 400);
     };
+
+    // --- Obtención de la lista de pistas del contexto ---
+    const { playlistTracks } = usePlaylist();
 
     // --- Renderizado del Componente Principal ---
     return (

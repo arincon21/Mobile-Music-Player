@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { runOnJS } from 'react-native-reanimated';
 import { triggerHapticFeedback } from '../utils/haptics';
-import { playlistTracks } from '../data/playlistData';
+import { usePlaylist } from '../context/PlaylistContext';
 import { CONSTANTS } from '../utils/constants';
-import { Track } from '../types';
 import * as Haptics from 'expo-haptics';
 
 export const usePlayer = () => {
+    const { playlistTracks } = usePlaylist();
     const [isExpanded, setIsExpanded] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -15,6 +15,22 @@ export const usePlayer = () => {
     const [likedTracks, setLikedTracks] = useState(new Set([1, 3]));
 
     const currentTrack = playlistTracks[currentTrackIndex];
+
+    const changeTrack = useCallback((direction: 'next' | 'prev') => {
+        triggerHapticFeedback();
+        let newIndex;
+        if (direction === 'next') {
+            newIndex = (currentTrackIndex + 1) % playlistTracks.length;
+        } else {
+            newIndex = (currentTrackIndex - 1 + playlistTracks.length) % playlistTracks.length;
+        }
+        setCurrentTrackIndex(newIndex);
+        setProgress(0);
+        if (!isPlaying) setIsPlaying(true);
+    }, [currentTrackIndex, isPlaying, playlistTracks.length]);
+
+    const nextTrack = useCallback(() => changeTrack('next'), [changeTrack]);
+    const prevTrack = useCallback(() => changeTrack('prev'), [changeTrack]);
 
     // Auto-progress simulation
     useEffect(() => {
@@ -32,7 +48,7 @@ export const usePlayer = () => {
             }, 1000);
         }
         return () => clearInterval(interval);
-    }, [isPlaying, currentTrackIndex]);
+    }, [isPlaying, currentTrackIndex, nextTrack]);
 
     const togglePlayPause = () => {
         triggerHapticFeedback(Haptics.ImpactFeedbackStyle.Medium);
@@ -56,22 +72,6 @@ export const usePlayer = () => {
         setProgress(0);
         if (!isPlaying) setIsPlaying(true);
     };
-
-    const changeTrack = (direction: 'next' | 'prev') => {
-        triggerHapticFeedback();
-        let newIndex;
-        if (direction === 'next') {
-            newIndex = (currentTrackIndex + 1) % playlistTracks.length;
-        } else {
-            newIndex = (currentTrackIndex - 1 + playlistTracks.length) % playlistTracks.length;
-        }
-        setCurrentTrackIndex(newIndex);
-        setProgress(0);
-        if (!isPlaying) setIsPlaying(true);
-    };
-
-    const nextTrack = () => changeTrack('next');
-    const prevTrack = () => changeTrack('prev');
 
     return {
         // State
