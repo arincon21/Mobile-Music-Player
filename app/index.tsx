@@ -4,6 +4,7 @@ import {
   SafeAreaView,
   StatusBar,
   Button,
+  ActivityIndicator, // <-- importado
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
@@ -20,7 +21,8 @@ import * as MediaLibrary from 'expo-media-library';
 
 export default function MusicPlayer() {
   const [permissionStatus, setPermissionStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
-  useLoadDeviceTracks(setPermissionStatus);
+  const [isLoadingTracks, setIsLoadingTracks] = useState(true);
+  useLoadDeviceTracks(setPermissionStatus, setIsLoadingTracks);
 
   // --- Estados de React ---
   const {
@@ -95,18 +97,42 @@ export default function MusicPlayer() {
     );
   }
 
-  if (!playlistTracks.length || !currentTrack) {
+  if (isLoadingTracks) {
     return (
       <View className="flex-1">
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <SafeAreaView className={`flex-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`} style={{ paddingTop: CONSTANTS.STATUS_BAR_HEIGHT }}>
-        <Header isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} />
-          <Animated.Text className="flex-1 items-center justify-center" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
-            {playlistTracks.length === 0 ? 'No se encontraron canciones en el dispositivo.' : 'Cargando...'}
-          </Animated.Text>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <SafeAreaView className={`flex-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`} style={{ paddingTop: CONSTANTS.STATUS_BAR_HEIGHT }}>
+          <Header isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} />
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color={isDarkMode ? '#6366f1' : '#a21caf'} style={{ marginBottom: 16 }} />
+            <Animated.Text className="items-center justify-center" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
+              Cargando canciones...
+            </Animated.Text>
+          </View>
         </SafeAreaView>
       </View>
     );
+  }
+
+  if (!playlistTracks.length) {
+    return (
+      <View className="flex-1">
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <SafeAreaView className={`flex-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`} style={{ paddingTop: CONSTANTS.STATUS_BAR_HEIGHT }}>
+          <Header isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} />
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <Animated.Text className="items-center justify-center" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
+              No se encontraron canciones en el dispositivo.
+            </Animated.Text>
+          </View>
+        </SafeAreaView>
+      </View>
+
+    );
+  }
+
+  if (!currentTrack) {
+    return null;
   }
 
   return (
@@ -125,7 +151,7 @@ export default function MusicPlayer() {
         />
       </SafeAreaView>
       <GestureDetector gesture={panGesture}>
-        <Animated.View className="bg-white rounded-t-[20px]" style={[animatedPlayerStyle, { position: 'absolute', top: 0, left: 0, right: 0, height: '100%' }]}> 
+        <Animated.View className="bg-white rounded-t-[20px]" style={[animatedPlayerStyle, { position: 'absolute', top: 0, left: 0, right: 0, height: '100%' }]}>
           {!isExpanded && (
             <MiniPlayer
               currentTrack={currentTrack}

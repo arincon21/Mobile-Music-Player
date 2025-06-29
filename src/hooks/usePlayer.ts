@@ -100,25 +100,35 @@ export const usePlayer = () => {
     };
 };
 
-export const useLoadDeviceTracks = (setPermissionStatus?: (status: 'unknown' | 'granted' | 'denied') => void) => {
-  const { setPlaylistTracks } = usePlaylist();
+export const useLoadDeviceTracks = (
+    setPermissionStatus?: (status: 'unknown' | 'granted' | 'denied') => void,
+    setIsLoadingTracks?: (loading: boolean) => void
+) => {
+    const { setPlaylistTracks } = usePlaylist();
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (setPermissionStatus) setPermissionStatus(status === 'granted' ? 'granted' : 'denied');
-      if (status !== 'granted') return;
-      const media = await MediaLibrary.getAssetsAsync({ mediaType: 'audio', first: 9999 });
-      const mp3s = media.assets.filter(asset => asset.filename.endsWith('.mp3'));
-      setPlaylistTracks(mp3s.map((asset, idx) => ({
-        id: idx + 1,
-        title: asset.filename.replace('.mp3', ''),
-        artist: 'Desconocido',
-        genre: '',
-        color: '#374151',
-        image: '🎵',
-        uri: asset.uri,
-      })));
-    })();
-  }, [setPlaylistTracks, setPermissionStatus]);
+    useEffect(() => {
+        (async () => {
+            try {
+                const { status } = await MediaLibrary.requestPermissionsAsync();
+                if (setPermissionStatus) setPermissionStatus(status === 'granted' ? 'granted' : 'denied');
+                if (status !== 'granted') {
+                    if (setIsLoadingTracks) setIsLoadingTracks(false);
+                    return;
+                }
+                const media = await MediaLibrary.getAssetsAsync({ mediaType: 'audio', first: 9999 });
+                const mp3s = media.assets.filter(asset => asset.filename.endsWith('.mp3'));
+                setPlaylistTracks(mp3s.map((asset, idx) => ({
+                    id: idx + 1,
+                    title: asset.filename.replace('.mp3', ''),
+                    artist: 'Desconocido',
+                    genre: '',
+                    color: '#374151',
+                    image: '🎵',
+                    uri: asset.uri,
+                })));
+            } finally {
+                if (setIsLoadingTracks) setIsLoadingTracks(false);
+            }
+        })();
+    }, [setPlaylistTracks, setPermissionStatus, setIsLoadingTracks]);
 };
