@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import Animated from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import TrackInfo from './TrackInfo';
 import ProgressBar from '../ui/ProgressBar';
 import PlayerControls from './PlayerControls';
@@ -35,12 +35,27 @@ export default function ExpandedPlayer({
     toggleLike,
     setIsExpanded,
 }: ExpandedPlayerProps) {
+    // --- Animación de opacidad para fade in/out del contenido ---
+    const fadeContentStyle = useAnimatedStyle(() => {
+        // El fade debe ser 0.5 cuando está colapsado (abajo), 1 cuando está expandido (arriba)
+        const min = CONSTANTS.STATUS_BAR_HEIGHT;
+        const max = CONSTANTS.SCREEN_HEIGHT - CONSTANTS.MINI_PLAYER_HEIGHT;
+        return {
+            opacity: interpolate(
+                animations.translateY.value,
+                [min, max],
+                [1, 0],
+                'clamp'
+            ),
+        };
+    });
+
     const collapsePlayer = () => {
         setIsExpanded(false);
     };
 
     return (
-        <Animated.View className="flex-1">
+        <Animated.View style={fadeContentStyle} className="flex-1">
             <View className={`flex-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                 {/* Header */}
                 <View className="flex-row items-center justify-between py-2">

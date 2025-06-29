@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import EqualizerBars from '../ui/EqualizerBars';
 import PlayerControls from './PlayerControls';
 import ProgressBar from '../ui/ProgressBar';
@@ -26,16 +26,34 @@ export default function MiniPlayer({
     nextTrack,
     prevTrack,
 }: MiniPlayerProps) {
+    // --- Animación de opacidad para fade in/out del contenido ---
+    const fadeContentStyle = useAnimatedStyle(() => {
+        // El fade debe ser 1 cuando está colapsado (abajo), 0.5 cuando está expandido (arriba)
+        const min = CONSTANTS.STATUS_BAR_HEIGHT;
+        const max = CONSTANTS.SCREEN_HEIGHT - CONSTANTS.MINI_PLAYER_HEIGHT;
+        return {
+            opacity: interpolate(
+                animations.translateY.value,
+                [min, max],
+                [0, 1],
+                'clamp'
+            ),
+        };
+    });
+
     return (
         <Animated.View
-            className="absolute top-0 left-0 right-0  shadow-lg"
-            style={{
-                height: CONSTANTS.MINI_PLAYER_HEIGHT,
-                shadowColor: '#000',
-                shadowOpacity: 0.12,
-                shadowRadius: 12,
-                shadowOffset: { width: 0, height: -2 },
-            }}
+            className="absolute top-0 left-0 right-0 shadow-lg"
+            style={[
+                {
+                    height: CONSTANTS.MINI_PLAYER_HEIGHT,
+                    shadowColor: '#000',
+                    shadowOpacity: 0.12,
+                    shadowRadius: 12,
+                    shadowOffset: { width: 0, height: -2 },
+                },
+                fadeContentStyle,
+            ]}
         >
             <View className="flex-1 px-6 pt-2 pb-4 justify-center">
                 <View className="absolute w-10 h-1 bg-gray-300 rounded-full self-center mb-3 top-1 opacity-80" />
