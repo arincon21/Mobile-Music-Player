@@ -13,6 +13,7 @@ import { useAnimations } from '@/hooks/useAnimations';
 import { useGestures } from '@/hooks/useGestures';
 import { usePlayer, useLoadDeviceTracks } from '@/hooks/usePlayer';
 import { usePlaylist } from '@/context/PlaylistContext';
+import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import Header from '@/components/common/Header';
 import ExpandedPlayer from '@/components/player/ExpandedPlayer';
 import MiniPlayer from '@/components/player/MiniPlayer';
@@ -28,24 +29,19 @@ export default function MusicPlayer() {
   const {
     isExpanded,
     setIsExpanded,
-    isPlaying,
-    currentTrackIndex,
-    progress,
     isDarkMode,
     setIsDarkMode,
     likedTracks,
-    currentTrack,
-    togglePlayPause,
-    nextTrack,
-    prevTrack,
     toggleLike,
-    switchTrack,
   } = usePlayer();
 
   const { playlistTracks } = usePlaylist();
 
+  // --- Integración del reproductor de audio real ---
+  const audioPlayer = useAudioPlayer(playlistTracks, 0);
+
   // --- Valores Animados de Reanimated ---
-  const animations = useAnimations(isPlaying);
+  const animations = useAnimations(audioPlayer.isPlaying);
   const { panGesture } = useGestures({
     translateY: animations.translateY,
     onExpand: () => setIsExpanded(true),
@@ -131,7 +127,7 @@ export default function MusicPlayer() {
     );
   }
 
-  if (!currentTrack) {
+  if (!audioPlayer.currentTrack) {
     return null;
   }
 
@@ -142,38 +138,38 @@ export default function MusicPlayer() {
         <Header isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} />
         <TrackList
           tracks={playlistTracks}
-          currentTrackIndex={currentTrackIndex}
-          isPlaying={isPlaying}
+          currentTrackIndex={audioPlayer.currentTrackIndex}
+          isPlaying={audioPlayer.isPlaying}
           isDarkMode={isDarkMode}
           likedTracks={likedTracks}
-          onTrackSelect={switchTrack}
+          onTrackSelect={audioPlayer.setCurrentTrackIndex}
           onToggleLike={toggleLike}
         />
       </SafeAreaView>
       <GestureDetector gesture={panGesture}>
-        <Animated.View className="bg-white rounded-t-[20px]" style={[animatedPlayerStyle, { position: 'absolute', top: 0, left: 0, right: 0, height: '100%' }]}>
+        <Animated.View className="bg-white rounded-t-[20px]" style={[animatedPlayerStyle, { position: 'absolute', top: 0, left: 0, right: 0, height: '100%' }]}> 
           {!isExpanded && (
             <MiniPlayer
-              currentTrack={currentTrack}
-              isPlaying={isPlaying}
-              progress={progress}
+              currentTrack={audioPlayer.currentTrack}
+              isPlaying={audioPlayer.isPlaying}
+              progress={audioPlayer.progress}
               animations={animations}
-              togglePlayPause={togglePlayPause}
-              nextTrack={nextTrack}
-              prevTrack={prevTrack}
+              togglePlayPause={audioPlayer.togglePlayPause}
+              nextTrack={audioPlayer.nextTrack}
+              prevTrack={audioPlayer.prevTrack}
             />
           )}
           {isExpanded && (
             <ExpandedPlayer
-              currentTrack={currentTrack}
-              isPlaying={isPlaying}
-              progress={progress}
+              currentTrack={audioPlayer.currentTrack}
+              isPlaying={audioPlayer.isPlaying}
+              progress={audioPlayer.progress}
               likedTracks={likedTracks}
               isDarkMode={isDarkMode}
               animations={animations}
-              togglePlayPause={togglePlayPause}
-              nextTrack={nextTrack}
-              prevTrack={prevTrack}
+              togglePlayPause={audioPlayer.togglePlayPause}
+              nextTrack={audioPlayer.nextTrack}
+              prevTrack={audioPlayer.prevTrack}
               toggleLike={toggleLike}
               setIsExpanded={setIsExpanded}
             />

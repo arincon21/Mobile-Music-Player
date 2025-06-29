@@ -5,6 +5,7 @@ export interface Track {
     genre: string;
     color: string;
     image: string;
+    uri?: string; // URI del archivo de audio
 }
 
 export interface PlayerState {
