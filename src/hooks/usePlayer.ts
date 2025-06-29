@@ -4,6 +4,7 @@ import { triggerHapticFeedback } from '../utils/haptics';
 import { usePlaylist } from '../context/PlaylistContext';
 import { CONSTANTS } from '../utils/constants';
 import * as Haptics from 'expo-haptics';
+import * as MediaLibrary from 'expo-media-library';
 
 export const usePlayer = () => {
     const { playlistTracks } = usePlaylist();
@@ -97,4 +98,27 @@ export const usePlayer = () => {
         nextTrack,
         prevTrack,
     };
+};
+
+export const useLoadDeviceTracks = (setPermissionStatus?: (status: 'unknown' | 'granted' | 'denied') => void) => {
+  const { setPlaylistTracks } = usePlaylist();
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (setPermissionStatus) setPermissionStatus(status === 'granted' ? 'granted' : 'denied');
+      if (status !== 'granted') return;
+      const media = await MediaLibrary.getAssetsAsync({ mediaType: 'audio', first: 9999 });
+      const mp3s = media.assets.filter(asset => asset.filename.endsWith('.mp3'));
+      setPlaylistTracks(mp3s.map((asset, idx) => ({
+        id: idx + 1,
+        title: asset.filename.replace('.mp3', ''),
+        artist: 'Desconocido',
+        genre: '',
+        color: '#374151',
+        image: '🎵',
+        uri: asset.uri,
+      })));
+    })();
+  }, [setPlaylistTracks, setPermissionStatus]);
 };
