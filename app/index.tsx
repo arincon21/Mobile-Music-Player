@@ -1,10 +1,49 @@
+/**
+ * MusicPlayer (Componente principal de la app)
+ * ---------------------------------------------
+ * Este componente es el punto de entrada de la aplicación de reproductor de música móvil.
+ * Se encarga de gestionar los permisos, cargar las canciones del dispositivo, controlar el estado global
+ * del reproductor, y renderizar la UI principal (lista de canciones, mini reproductor y reproductor expandido).
+ *
+ * Principales responsabilidades:
+ * - Solicitar y gestionar permisos de acceso a la biblioteca de medios del dispositivo.
+ * - Cargar las canciones locales usando el hook useLoadDeviceTracks.
+ * - Gestionar el estado global del reproductor (tema, pista actual, pistas favoritas, etc.) usando usePlayer y usePlaylist.
+ * - Integrar el reproductor de audio real con useAudioPlayer.
+ * - Renderizar la cabecera, la lista de canciones, el mini reproductor y el reproductor expandido.
+ * - Manejar animaciones y gestos para expandir/colapsar el reproductor.
+ *
+ * Hooks y contextos utilizados:
+ * - usePlayer: Estado global del reproductor (tema, pista actual, favoritos, expandido, etc.).
+ * - usePlaylist: Provee la lista de canciones cargadas.
+ * - useAudioPlayer: Controla la reproducción de audio (play, pause, siguiente, anterior, progreso, etc.).
+ * - useAnimations: Provee valores animados para transiciones y gestos.
+ * - useGestures: Maneja gestos de usuario para expandir/colapsar el reproductor.
+ * - useLoadDeviceTracks: Carga las canciones del dispositivo y gestiona el estado de permisos.
+ *
+ * Componentes principales:
+ * - Header: Barra superior con control de tema.
+ * - TrackItem: Renderiza cada canción en la lista.
+ * - MiniPlayer: Reproductor compacto que se muestra cuando el reproductor no está expandido.
+ * - ExpandedPlayer: Reproductor completo con controles y detalles de la canción.
+ *
+ * Flujo principal:
+ * 1. Solicita permisos para acceder a la música del dispositivo.
+ * 2. Si no hay permiso, muestra pantalla para solicitarlo.
+ * 3. Si está cargando canciones, muestra indicador de carga.
+ * 4. Si no hay canciones, muestra mensaje.
+ * 5. Si todo está correcto, muestra la lista de canciones y el reproductor.
+ *
+ * Props: No recibe props, es el componente raíz de la app.
+ */
 import React, { useState } from 'react';
 import {
   View,
   SafeAreaView,
   StatusBar,
   Button,
-  ActivityIndicator, // <-- importado
+  ActivityIndicator,
+  FlatList
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
@@ -18,7 +57,6 @@ import Header from '@/components/common/Header';
 import ExpandedPlayer from '@/components/player/ExpandedPlayer';
 import MiniPlayer from '@/components/player/MiniPlayer';
 import TrackItem from '@/components/playlist/TrackItem';
-import { FlatList } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 
 export default function MusicPlayer() {

@@ -37,7 +37,6 @@ export default memo(function ExpandedPlayer({
 }: ExpandedPlayerProps) {
     // --- Animación de opacidad para fade in/out del contenido ---
     const fadeContentStyle = useAnimatedStyle(() => {
-        // El fade debe ser 0.5 cuando está colapsado (abajo), 1 cuando está expandido (arriba)
         const min = CONSTANTS.STATUS_BAR_HEIGHT;
         const max = CONSTANTS.SCREEN_HEIGHT - CONSTANTS.MINI_PLAYER_HEIGHT;
         return {
