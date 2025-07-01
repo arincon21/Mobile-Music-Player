@@ -5,6 +5,9 @@ Una aplicación móvil de reproductor de música construida con React Native, Ex
 ## Captura de pantalla
 
 ![Captura de pantalla de la app](./assets/screenshot1.jpg)
+
+
+
 ![Captura de pantalla de la app](./assets/screenshot2.jpg)
 
 ## Características
