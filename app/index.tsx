@@ -64,8 +64,10 @@ import { triggerHapticFeedback } from '@/utils/haptics';
 import * as MediaLibrary from 'expo-media-library';
 
 
+type PermissionStatus = 'unknown' | 'granted' | 'denied';
+
 export default function MusicPlayer() {
-  const [permissionStatus, setPermissionStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
+  const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('unknown');
   const [isLoadingTracks, setIsLoadingTracks] = useState(true);
   const [search, setSearch] = useState('');
   useLoadDeviceTracks(setPermissionStatus, setIsLoadingTracks);
@@ -106,20 +108,6 @@ export default function MusicPlayer() {
   } : {};
 
   // --- Renderizado del Componente Principal ---
-  if (permissionStatus === 'unknown') {
-    return (
-      <View className="flex-1 items-center justify-center bg-slate-100 dark:bg-slate-800">
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-        <Header isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} />
-        <SafeAreaView className="flex-1 items-center justify-center">
-          <Animated.Text style={{ color: isDarkMode ? '#fff' : '#222', fontSize: 18, marginTop: 32 }}>
-            Cargando permisos...
-          </Animated.Text>
-        </SafeAreaView>
-      </View>
-    );
-  }
-
   if (permissionStatus === 'unknown') {
     return (
       <View className="flex-1 items-center justify-center bg-slate-100 dark:bg-slate-800">
@@ -221,37 +209,45 @@ export default function MusicPlayer() {
           }}
           accessibilityLabel="Buscar canciones"
         />
-        <FlatList
-          data={filteredTracks}
-          renderItem={({ item, index }) => {
-            const handlePress = () => {
-              triggerHapticFeedback();
-              if (audioPlayer.currentTrackIndex === index) {
-                audioPlayer.togglePlayPause();
-              } else {
-                audioPlayer.setCurrentTrackIndex(index);
-              }
-            };
-            const handleToggleLike = () => {
-              triggerHapticFeedback();
-              toggleLike(item.id);
-            };
-            return (
-              <TrackItem
-                track={item}
-                index={index}
-                isCurrentTrack={audioPlayer.currentTrackIndex === index}
-                isPlaying={audioPlayer.isPlaying && audioPlayer.currentTrackIndex === index}
-                isDarkMode={isDarkMode}
-                isLiked={likedTracks.has(item.id)}
-                onPress={handlePress}
-                onToggleLike={handleToggleLike}
-              />
-            );
-          }}
-          keyExtractor={item => item.id.toString()}
-          contentContainerStyle={{ paddingBottom: 120 }}
-        />
+        {filteredTracks.length === 0 ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 32 }}>
+            <Animated.Text style={{ color: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 18, textAlign: 'center' }}>
+              No se encontraron canciones que coincidan con tu búsqueda.
+            </Animated.Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredTracks}
+            renderItem={({ item, index }) => {
+              const handlePress = () => {
+                triggerHapticFeedback();
+                if (audioPlayer.currentTrackIndex === index) {
+                  audioPlayer.togglePlayPause();
+                } else {
+                  audioPlayer.setCurrentTrackIndex(index);
+                }
+              };
+              const handleToggleLike = () => {
+                triggerHapticFeedback();
+                toggleLike(item.id);
+              };
+              return (
+                <TrackItem
+                  track={item}
+                  index={index}
+                  isCurrentTrack={audioPlayer.currentTrackIndex === index}
+                  isPlaying={audioPlayer.isPlaying && audioPlayer.currentTrackIndex === index}
+                  isDarkMode={isDarkMode}
+                  isLiked={likedTracks.has(item.id)}
+                  onPress={handlePress}
+                  onToggleLike={handleToggleLike}
+                />
+              );
+            }}
+            keyExtractor={item => item.id.toString()}
+            contentContainerStyle={{ paddingBottom: 120 }}
+          />
+        )}
       </SafeAreaView>
       <GestureDetector gesture={panGesture}>
         <Animated.View className="bg-white rounded-t-[20px]" style={[animatedPlayerStyle, { position: 'absolute', top: 0, left: 0, right: 0, height: '100%' }]}> 
