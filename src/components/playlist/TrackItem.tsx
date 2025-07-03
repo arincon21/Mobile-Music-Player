@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import EqualizerBars from '../ui/EqualizerBars';
 import { Track } from '../../types';
+import { triggerHapticFeedback } from '@/utils/haptics';
 import { useAnimations } from '@/hooks/useAnimations';
 
 interface TrackItemProps {
@@ -16,7 +17,7 @@ interface TrackItemProps {
     onToggleLike: () => void;
 }
 
-export default function TrackItem({
+const TrackItem = React.memo(function TrackItem({
     track,
     isCurrentTrack,
     isPlaying,
@@ -25,15 +26,23 @@ export default function TrackItem({
     onPress,
     onToggleLike,
 }: TrackItemProps) {
-
     const animations = useAnimations(isPlaying);
+
+    const handlePress = useCallback(() => {
+        triggerHapticFeedback();
+        onPress();
+    }, [onPress]);
+
+    const handleToggleLike = useCallback(() => {
+        triggerHapticFeedback();
+        onToggleLike();
+    }, [onToggleLike]);
 
     return (
         <TouchableOpacity
-            onPress={onPress}
+            onPress={handlePress}
             activeOpacity={0.7}
-            className={`flex-row items-center p-2 rounded-lg mb-2 ${isCurrentTrack ? (isDarkMode ? 'bg-slate-700' : 'bg-gray-200') : ''
-                }`}
+            className={`flex-row items-center p-2 rounded-lg mb-2 ${isCurrentTrack ? (isDarkMode ? 'bg-slate-700' : 'bg-gray-200') : ''}`}
             accessibilityRole="button"
             accessibilityLabel={`Play ${track.title} by ${track.artist}`}
             accessibilityState={{ selected: isCurrentTrack }}
@@ -71,7 +80,7 @@ export default function TrackItem({
             )}
 
             <TouchableOpacity
-                onPress={onToggleLike}
+                onPress={handleToggleLike}
                 className="p-2"
                 accessibilityRole="button"
                 accessibilityLabel={isLiked ? `Unlike ${track.title}` : `Like ${track.title}`}
@@ -84,4 +93,5 @@ export default function TrackItem({
             </TouchableOpacity>
         </TouchableOpacity>
     );
-}
+});
+export default TrackItem;
